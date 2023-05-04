@@ -20,60 +20,77 @@ function Cube.new(x, y, z, width, height, depth, color)
 end
 
 function Cube:draw()
-    local vertices = {
-        { x = self.x, y = self.y, z = self.z },
-        { x = self.x + self.width, y = self.y, z = self.z },
-        { x = self.x, y = self.y + self.height, z = self.z },
-        { x = self.x + self.width, y = self.y + self.height, z = self.z },
-        { x = self.x, y = self.y, z = self.z + self.depth },
-        { x = self.x + self.width, y = self.y, z = self.z + self.depth },
-        { x = self.x, y = self.y + self.height, z = self.z + self.depth },
-        { x = self.x + self.width, y = self.y + self.height, z = self.z + self.depth },
-    }
-
-    local faces = {
-        { vertices[1], vertices[2], vertices[4], vertices[3] },
-        { vertices[1], vertices[2], vertices[6], vertices[5] },
-        { vertices[1], vertices[3], vertices[7], vertices[5] },
-        { vertices[2], vertices[4], vertices[8], vertices[6] },
-        { vertices[3], vertices[4], vertices[8], vertices[7] },
-        { vertices[5], vertices[6], vertices[8], vertices[7] },
-    }
-
-    for i, face in ipairs(faces) do
-        local points = {}
-        for j, vertex in ipairs(face) do
-            local point = {
-                x = vertex.x - camera.x,
-                y = vertex.y - camera.y,
-                z = vertex.z - camera.z
-            }
-            point.x, point.z = math.cos(camera.yaw) * point.x - math.sin(camera.yaw) * point.z, math.sin(camera.yaw) * point.x + math.cos(camera.yaw) * point.z
-            point.y, point.z = math.cos(camera.pitch) * point.y - math.sin(camera.pitch) * point.z, math.sin(camera.pitch) * point.y + math.cos(camera.pitch) * point.z
-            if point.z <= 0 then
-                return
-            end
-            local scale = camera.fov / point.z
-            point.x, point.y = point.x * scale, point.y * scale
-            point.x, point.y = point.x + screenWidth / 2, point.y + screenHeight / 2
-            points[j] = point
-        end
-        local color = self.color
-        if i == 1 then
-            color = colors.orange
-        elseif i == 2 then
-            color = colors.magenta
-        elseif i == 3 then
-            color = colors.lightBlue
-        elseif i == 4 then
-            color = colors.yellow
-        elseif i == 5 then
-            color = colors.lime
-        elseif i == 6 then
-            color = colors.pink
-        end
-        paintutils.drawPolygon(points, color)
+    local points = {}
+    local function addPoint(x, y)
+        table.insert(points, {x, y})
     end
+
+    -- Calcul des coordonnées 3D du cube dans le référentiel de la caméra
+    local cosYaw = math.cos(-camera.yaw)
+    local sinYaw = math.sin(-camera.yaw)
+    local cosPitch = math.cos(-camera.pitch)
+    local sinPitch = math.sin(-camera.pitch)
+    local cx = self.x - camera.x
+    local cy = self.y - camera.y
+    local cz = self.z - camera.z
+    local dx = cosYaw * (sinPitch * cz + cosPitch * (sinYaw * cy + cosYaw * cx)) - sinYaw * sinPitch * cx
+    local dy = cosPitch * cy - sinPitch * (cosYaw * cz - sinYaw * cx)
+    local dz = sinYaw * (sinPitch * cz + cosPitch * (sinYaw * cy + cosYaw * cx)) + cosYaw * sinPitch * cx
+
+    -- Projection en 2D
+    local scaleFactor = (camera.fov / dz)
+    local x = math.floor(0.5 * term.getSize() + scaleFactor * dx)
+    local y = math.floor(0.5 * term.getSize() - scaleFactor * dy)
+
+    -- Dessin des faces
+    local color = self.color
+    local function drawFace(p1, p2, p3, p4)
+        paintutils.drawLine(p1[1], p1[2], p2[1], p2[2], color)
+        paintutils.drawLine(p2[1], p2[2], p3[1], p3[2], color)
+        paintutils.drawLine(p3[1], p3[2], p4[1], p4[2], color)
+        paintutils.drawLine(p4[1], p4[2], p1[1], p1[2], color)
+    end
+    -- Face avant
+    addPoint(x - self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x + self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x + self.width * scaleFactor, y + self.height * scaleFactor)
+    addPoint(x - self.width * scaleFactor, y + self.height * scaleFactor)
+    drawFace(points[1], points[2], points[3], points[4])
+    points = {}
+    -- Face arrière
+    addPoint(x + self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x - self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x - self.width * scaleFactor, y + self.height * scaleFactor)
+    addPoint(x + self.width * scaleFactor, y + self.height * scaleFactor)
+    drawFace(points[1], points[2], points[3], points[4])
+    points = {}
+    -- Face gauche
+    addPoint(x - self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x - self.width * scaleFactor, y + self.height * scaleFactor)
+    addPoint(x, y + self.height * scaleFactor * 0.5)
+    addPoint(x, y - self.height * scaleFactor * 0.5)
+    drawFace(points[1], points[2], points[3], points[4])
+    points = {}
+    -- Face droite
+    addPoint(x + self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x + self.width * scaleFactor, y + self.height * scaleFactor)
+    addPoint(x, y + self.height * scaleFactor * 0.5)
+    addPoint(x, y - self.height * scaleFactor * 0.5)
+    drawFace(points[1], points[2], points[3], points[4])
+    points = {}
+    -- Face supérieure
+    addPoint(x - self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x, y - self.height * scaleFactor * 0.5)
+    addPoint(x + self.width * scaleFactor, y - self.height * scaleFactor)
+    addPoint(x, y + self.height * scaleFactor * 0.5)
+    drawFace(points[1], points[2], points[3], points[4])
+    points = {}
+    -- Face inférieure
+    addPoint(x - self.width * scaleFactor, y + self.height * scaleFactor)
+    addPoint(x, y + self.height * scaleFactor * 0.5)
+    addPoint(x + self.width * scaleFactor, y + self.height * scaleFactor)
+    addPoint(x, y - self.height * scaleFactor * 0.5)
+    drawFace(points[1], points[2], points[3], points[4])
 end
 
 -- Fonction pour ajouter des cubes à la scène
